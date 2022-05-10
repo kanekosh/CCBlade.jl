@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import openmdao.api as om
-from omjl import make_component
+from julia.OpenMDAO import make_component
 from ccblade.ccblade_py import FunctionalsComp
 from julia.CCBladeOpenMDAOExample import CCBladeResidualComp
 from julia.CCBlade import af_from_files
