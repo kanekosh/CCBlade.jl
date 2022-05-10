@@ -433,11 +433,13 @@ function solve(rotor, section, op)
         if Vx > 0 && abs(theta) < pi/2
             order = (q1, q3)
         elseif Vx < 0 && abs(theta) < pi/2
-            order = (q2, q4)
+            ### order = (q2, q4)
+            order = (q1, q3)   # my modification
         elseif Vx > 0 && abs(theta) > pi/2
             order = (q3, q1)
         else  # Vx < 0 && abs(theta) > pi/2
-            order = (q4, q2)
+            ### order = (q4, q2)
+            order = (q3, q1)   # my modification
         end
 
     else  # normal case
@@ -447,11 +449,13 @@ function solve(rotor, section, op)
         if Vx > 0 && Vy > 0
             order = (q1, q2, q3, q4)
         elseif Vx < 0 && Vy > 0
-            order = (q2, q1, q4, q3)
+            ### order = (q2, q1, q4, q3)
+            order = (q1, q2, q3, q4)  # my modification
         elseif Vx > 0 && Vy < 0
             order = (q3, q4, q1, q2)
         else  # Vx[i] < 0 && Vy[i] < 0
-            order = (q4, q3, q2, q1)
+            ### order = (q4, q3, q2, q1)
+            order = (q3, q4, q1, q2)  # my modification
         end
 
     end
