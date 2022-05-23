@@ -292,6 +292,9 @@ function afeval(af::AlphaReAF, alpha, Re, Mach)
 
     cl = FLOWMath.interp2d(FLOWMath.akima, af.alpha, af.Re, af.cl, [alpha], [Re])[1]
     cd = FLOWMath.interp2d(FLOWMath.akima, af.alpha, af.Re, af.cd, [alpha], [Re])[1]
+    # NOTE: maybe replace 1D interpolation by a cheaper one: FLOWMath.linear
+    # cl = FLOWMath.interp2d(FLOWMath.linear, af.alpha, af.Re, af.cl, [alpha], [Re])[1]
+    # cd = FLOWMath.interp2d(FLOWMath.linear, af.alpha, af.Re, af.cd, [alpha], [Re])[1]
 
     return cl, cd
 end
@@ -607,8 +610,14 @@ DuSeligEggers() = DuSeligEggers(1.0, 1.0, 1.0, 2*pi, 0.0)
 
 function rotation_correction(du::DuSeligEggers, cl, cd, cr, rR, tsr, alpha, phi=alpha, alpha_max_corr=30*pi/180)
     
+    if tsr <= 0
+        # this model assumption is probably not valid for Vy <= 0 (-> tsr <= 0).
+        # Also, correction doesn't matter in Vy<=0 cases because the aero force there is small after all.
+        return cl, cd
+    end
+
     # Du-Selig correction for lift
-    Lambda = tsr / sqrt(1 + tsr^2)
+    Lambda = tsr / sqrt(1 + tsr^2)   # Note: singular for -0.005 <= Lambda <= 0
     expon = du.d / (Lambda * rR)
     fcl = 1.0/du.m*(1.6*cr/0.1267*(du.a-cr^expon)/(du.b+cr^expon)-1)
 
