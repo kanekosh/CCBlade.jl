@@ -217,6 +217,7 @@ function residual(phi, rotor, section, op)
     end
 
     # airfoil corrections
+    # NOTE: The rotation correction does not work when Vy<=0 and |Vy|<<1, and it returns NaN for CL and CD.
     if !isnothing(rotor.re)
         cl, cd = re_correction(rotor.re, cl, cd, Re)
     end
@@ -399,7 +400,7 @@ function solve(rotor, section, op)
     theta = section.theta + op.pitch
 
     # ---- determine quadrants based on case -----
-    Vx_is_zero = isapprox(Vx, 0.0, atol=1e-6)
+    Vx_is_zero = isapprox(Vx, 0.0, atol=1e-6)   # loosing atol may improve accuracy of partials
     Vy_is_zero = isapprox(Vy, 0.0, atol=1e-6)
 
     # quadrants
@@ -660,6 +661,67 @@ function thrusttorque(rotor, sections, outputs::Matrix{TO}) where TO
     end
 
     return T, Q
+end
+
+"""
+    thrusttorquesideforce(rotor, sections, outputs::Vector{TO}) where TO
+
+integrate the thrust/torque/in-plane force across the blade, 
+including 0 loads at hub/tip, using a trapezoidal rule.
+
+**Arguments**
+- `rotor::Rotor`: rotor object
+- `sections::Vector{Section}`: rotor object
+- `outputs::Vector{Outputs}`: output data along blade
+
+**Returns**
+- `T::Float64`: thrust (along x-dir see Documentation).
+- `Q::Float64`: torque (along x-dir see Documentation).
+"""
+function thrusttorquesideforce(rotor, sections, outputs::Vector{TO}) where TO
+
+    # add hub/tip for complete integration.  loads go to zero at hub/tip.
+    rvec = [s.r for s in sections]
+    rfull = [rotor.Rhub; rvec; rotor.Rtip]
+    Npfull = [0.0; outputs.Np; 0.0]
+    Tpfull = [0.0; outputs.Tp; 0.0]
+
+    # integrate Thrust and Torque (trapezoidal)
+    thrust = Npfull*cos(rotor.precone)
+    torque = Tpfull.*rfull*cos(rotor.precone)
+
+    T = rotor.B * FLOWMath.trapz(rfull, thrust)
+    Q = rotor.B * FLOWMath.trapz(rfull, torque)
+    F = rotor.B * FLOWMath.trapz(rfull, Tpfull)   # in-plane force
+
+    return T, Q, F
+end
+
+
+"""
+    thrusttorquedrag(rotor, sections, azimuth, outputs::Matrix{TO}) where TO
+
+Integrate the thrust/torque across the blade given an array of output data.
+Generally used for azimuthal averaging of thrust/torque.
+`outputs[i, j]` corresponds to `sections[i], azimuth[j]`.  Integrates across azimuth
+
+Drag = in-plane force parallel to skewed inflow direction, i.e., "drag" of the rotor as an lifting surface. Relevant for edgewise flight
+"""
+function thrusttorquedrag(rotor, sections, azimuth, outputs::Matrix{TO}) where TO
+
+    T = 0.0
+    Q = 0.0
+    F = 0.0  # in-plane side force in sideflow direction (i.e., "drag" of the rotor as a lifting surface)
+    nr, naz = size(outputs)
+
+    for j = 1:naz
+        Tsub, Qsub, Fsub = thrusttorquesideforce(rotor, sections, outputs[:, j])
+        T += Tsub / naz
+        Q += Qsub / naz
+        F += Fsub * sin(azimuth[j]) / naz  # sin or cos here depends on how I define azimuth in rotor_comp.jl
+    end
+
+    return T, Q, F
 end
 
 

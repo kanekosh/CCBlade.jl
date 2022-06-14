@@ -292,7 +292,7 @@ function afeval(af::AlphaReAF, alpha, Re, Mach)
 
     cl = FLOWMath.interp2d(FLOWMath.akima, af.alpha, af.Re, af.cl, [alpha], [Re])[1]
     cd = FLOWMath.interp2d(FLOWMath.akima, af.alpha, af.Re, af.cd, [alpha], [Re])[1]
-    # NOTE: maybe replace 1D interpolation by a cheaper one: FLOWMath.linear
+    # NOTE: maybe replace 1D interpolation by a linear interpolation (not smooth but cheap)
     # cl = FLOWMath.interp2d(FLOWMath.linear, af.alpha, af.Re, af.cl, [alpha], [Re])[1]
     # cd = FLOWMath.interp2d(FLOWMath.linear, af.alpha, af.Re, af.cd, [alpha], [Re])[1]
 
