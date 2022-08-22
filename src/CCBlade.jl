@@ -284,8 +284,10 @@ function residual(phi, rotor, section, op)
         u = a * Vx
 
         # -------- tangential induction ----------
+        # my modification. This makes BEMT outputs (thrust, torque) smooth for small negative velocity, should be valid for powered descent
         if Vx < 0
-            kp *= -1
+            ### kp *= -1
+            kp *= 1
         end
 
         if isapprox(kp, -1.0, atol=1e-6)  # state corresopnds to Vy=0, return any nonzero residual
@@ -459,6 +461,11 @@ function solve(rotor, section, op)
             order = (q3, q4, q1, q2)  # my modification
         end
 
+        # NOTE: for powered descent of UAV (inflow Vx is negative, but the rotor still generates thrust),
+        # the induced velocity is positive and larger than Vx, hence the local flow angle phi is positive.
+        # This is why I made this modification to the bracketing order.
+        # This modification is probably not valid for Vx << 0, or when the rotor doesn't generate much thrust.
+
     end
 
         
@@ -495,6 +502,16 @@ function solve(rotor, section, op)
         if success
             phistar, _ = FLOWMath.brent(R, phiL, phiU)
             _, outputs = residual(phistar, rotor, section, op)
+
+            # --- debug print solutions ---
+            ### print("vx = ")
+            ### print(Vx)
+            ### print(", vy = ")
+            ### print(Vy)
+            ### print(", phi = ")
+            ### println(phistar * 180 / pi)
+            ### print(", Normal Np = ")
+            ### println(outputs.Np)
             return outputs
         end    
     end    
