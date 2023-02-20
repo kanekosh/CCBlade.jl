@@ -265,7 +265,8 @@ function residual(phi, rotor, section, op)
             k *= -1
         end
 
-        if isapprox(k, 1.0, atol=1e-6)  # state corresopnds to Vx=0, return any nonzero residual
+        if isapprox(k, 1.0, atol=1e-10)  # state corresopnds to Vx=0, return any nonzero residual
+            # NOTE: reduce the tolerance here to avoid analysis failure in near-hover cases with fine radius mesh
             return 1.0, Outputs()
         end
 
@@ -286,12 +287,13 @@ function residual(phi, rotor, section, op)
         # -------- tangential induction ----------
         # my modification. This makes BEMT outputs (thrust, torque) smooth for small negative velocity, should be valid for powered descent
         if Vx < 0
-            ### kp *= -1
-            kp *= 1
+            kp *= -1   # original
+            ### kp *= 1   # my hack (which I shouldn't do)
         end
 
-        if isapprox(kp, -1.0, atol=1e-6)  # state corresopnds to Vy=0, return any nonzero residual
-            return 1.0, Outputs()
+        if isapprox(kp, -1.0, atol=1e-10)  # state corresopnds to Vy=0, return any nonzero residual
+            # NOTE: reduce the tolerance here to avoid analysis failure in high advance ratio cases with fine radius mesh
+            return 2.0, Outputs()
         end
 
         ap = kp/(1 + kp)
@@ -500,18 +502,64 @@ function solve(rotor, section, op)
 
         # once bracket is found, solve root finding problem and compute loads
         if success
-            phistar, _ = FLOWMath.brent(R, phiL, phiU)
-            _, outputs = residual(phistar, rotor, section, op)
+            ### phistar, _ = FLOWMath.brent(R, phiL, phiU)
+            ### _, outputs = residual(phistar, rotor, section, op)
+            phistar, brent_outputs = FLOWMath.brent(R, phiL, phiU; atol=1e-14, rtol=0.0)
+            Rval, outputs = residual(phistar, rotor, section, op)
 
             # --- debug print solutions ---
-            ### print("vx = ")
-            ### print(Vx)
-            ### print(", vy = ")
-            ### print(Vy)
-            ### print(", phi = ")
-            ### println(phistar * 180 / pi)
-            ### print(", Normal Np = ")
-            ### println(outputs.Np)
+            #=
+            print("vx = ")
+            print(Vx)
+            print(", phi = ")
+            print(phistar * 180 / pi)
+            print(", Normal Np = ")
+            print(outputs.Np)
+            print(", residual = ")
+            println(Rval)
+            =#
+
+            if abs(Rval) > 1e-6 && abs(outputs.Np) > 100
+                println("+++++++++++++++++++++++++++++++++++++++")
+                print("Brent solver failed! Residual = ")
+                println(Rval)
+                print("vx = ")
+                print(Vx)
+                ### print(", vy = ")
+                ### print(Vy)
+                print(", phi = ")
+                print(phistar * 180 / pi)
+                print(", Normal Np = ")
+                println(outputs.Np)
+                # evaluate residual function at PhiL and PhiU
+                R_phiL, _ = residual(phiL, rotor, section, op)
+                R_phiU, _ = residual(phiU, rotor, section, op)
+                print("PhiL = ")
+                print(phiL * 180 / pi)
+                print(", R = ")
+                println(R_phiL)
+                print("PhiU = ")
+                print(phiU * 180 / pi)
+                print(", R = ")
+                println(R_phiU)
+                ### if abs(R_phiL) < 100 && abs(R_phiU) < 100
+                if abs(outputs.Np) > 100
+                    # compute R(phi) for this bracket
+                    phi_debug = range(phistar - 1e-8, phistar + 1e-8, length=200)
+                    print("phi_debug =")
+                    println(phi_debug * 180 / pi)
+                    R_debug = zeros(200)
+                    for i in 1:200
+                        R_debug[i], _ = residual(phi_debug[i], rotor, section, op)
+                    end
+                    print("R_debug =")
+                    println(R_debug)
+                end
+                print("brent solver info:")
+                println(brent_outputs)
+                println("+++++++++++++++++++++++++++++++++++++++")
+            end
+
             return outputs
         end    
     end    
